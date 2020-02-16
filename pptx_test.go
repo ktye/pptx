@@ -51,11 +51,13 @@ func (f File) printPath(filePath string) error {
 	return fmt.Errorf("file %s does not exist", filePath)
 }
 
-func greyImage() image.Image {
+type greyImage struct{}
+
+func (g greyImage) Raster() (image.Image, error) {
 	w, h := 500, 300
 	im := image.NewGray(image.Rect(0, 0, w, h))
 	draw.Draw(im, im.Bounds(), &image.Uniform{color.Gray{128}}, image.ZP, draw.Src)
-	return im
+	return im, nil
 }
 
 func TestAppend(t *testing.T) {
@@ -67,7 +69,7 @@ func TestAppend(t *testing.T) {
 				Image{
 					X:     60 * MilliMeter,
 					Y:     20 * MilliMeter,
-					Image: greyImage(),
+					Image: greyImage{},
 				},
 			},
 			TextBoxes: []TextBox{
@@ -105,7 +107,7 @@ func TestAppend(t *testing.T) {
 				Image{
 					X:     60 * MilliMeter,
 					Y:     20 * MilliMeter,
-					Image: greyImage(),
+					Image: greyImage{},
 				},
 			},
 			TextBoxes: []TextBox{

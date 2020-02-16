@@ -81,11 +81,12 @@ func (s *Slide) build(f *File) error {
 		}
 	}
 	for i, im := range s.Images {
-		if err := s.addImageRef(im, i); err != nil {
+		if m, err := s.addImageRef(im, i); err != nil {
 			return err
-		}
-		if err := f.addImageFile(im, i, s.n); err != nil {
-			return err
+		} else {
+			if err = f.addImageFile(m, i, s.n); err != nil {
+				return err
+			}
 		}
 	}
 	return nil

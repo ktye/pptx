@@ -17,49 +17,57 @@ import (
 // An Image can be added to a Slide.
 type Image struct {
 	X, Y  Dimension
-	Image image.Image
+	Image Raster
+}
+
+// Raster knows how to create an Image.
+type Raster interface {
+	Raster() (image.Image, error)
+}
+
+// addImageRef adds the image reference to the the slide's xml tree.
+// The image reference is appended to the slide at the path:
+// <p:sld...><p:cSld><p:spTree>
+func (s *Slide) addImageRef(im Image, imageNum int) (image.Image, error) {
+	xml, m, err := im.build(imageNum)
+	if err != nil {
+		return m, err
+	}
+	root := s.xml.Root()
+	if root == nil {
+		return m, fmt.Errorf("Cannot find root element")
+	}
+	var spTree *etree.Element
+	if spTree = root.FindElement("p:cSld/p:spTree"); spTree == nil {
+		return m, fmt.Errorf("Cannot find spTree")
+	}
+	imRoot := xml.Root()
+	if imRoot == nil {
+		return m, fmt.Errorf("Cannot find imRoot element")
+	}
+	spTree.Child = append(spTree.Child, imRoot)
+	return m, nil
 }
 
 // addImageFile adds the png file to the presentation.
-func (f *File) addImageFile(im Image, imageNum, slideNum int) error {
+func (f *File) addImageFile(m image.Image, imageNum, slideNum int) error {
 	imagePath := fmt.Sprintf("ppt/media/slide%dimage%d.png", slideNum, imageNum)
 	var b bytes.Buffer
-	if err := png.Encode(&b, im.Image); err != nil {
+	if err := png.Encode(&b, m); err != nil {
 		return fmt.Errorf("slide %d image %d: %s", slideNum, imageNum, err)
 	}
 	f.m[imagePath] = &b
 	return nil
 }
 
-// addImageRef adds the image reference to the the slide's xml tree.
-// The image reference is appended to the slide at the path:
-// <p:sld...><p:cSld><p:spTree>
-// addImageRef adds the image reference to the slide's xml tree.
-func (s *Slide) addImageRef(im Image, imageNum int) error {
-	xml, err := im.build(imageNum)
-	if err != nil {
-		return err
-	}
-	root := s.xml.Root()
-	if root == nil {
-		return fmt.Errorf("Cannot find root element")
-	}
-	var spTree *etree.Element
-	if spTree = root.FindElement("p:cSld/p:spTree"); spTree == nil {
-		return fmt.Errorf("Cannot find spTree")
-	}
-	imRoot := xml.Root()
-	if imRoot == nil {
-		return fmt.Errorf("Cannot find imRoot element")
-	}
-	spTree.Child = append(spTree.Child, imRoot)
-	return nil
-}
-
 // build create the xml tree of the image reference.
-func (im *Image) build(imNum int) (*etree.Document, error) {
-	cxDim := Dimension(im.Image.Bounds().Dx()) * Inch / Dpi
-	cyDim := Dimension(im.Image.Bounds().Dy()) * Inch / Dpi
+func (im *Image) build(imNum int) (*etree.Document, image.Image, error) {
+	m, err := im.Image.Raster()
+	if err != nil {
+		return nil, nil, err
+	}
+	cxDim := Dimension(m.Bounds().Dx()) * Inch / Dpi
+	cyDim := Dimension(m.Bounds().Dy()) * Inch / Dpi
 	x := strconv.FormatUint(uint64(im.X), 10)
 	y := strconv.FormatUint(uint64(im.Y), 10)
 	cx := strconv.FormatUint(uint64(cxDim), 10)
@@ -104,8 +112,8 @@ func (im *Image) build(imNum int) (*etree.Document, error) {
 </p:spPr>
 </p:pic>`
 	doc := etree.NewDocument()
-	err := doc.ReadFromString(template)
-	return doc, err
+	err = doc.ReadFromString(template)
+	return doc, m, err
 }
 
 /* This original image was 192x107
