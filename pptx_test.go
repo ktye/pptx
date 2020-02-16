@@ -51,7 +51,7 @@ func (f File) printPath(filePath string) error {
 	return fmt.Errorf("file %s does not exist", filePath)
 }
 
-type greyImage struct{}
+type greyImage struct{ NoExchange }
 
 func (g greyImage) Raster() (image.Image, error) {
 	w, h := 500, 300

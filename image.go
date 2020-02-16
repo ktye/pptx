@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"image"
 	"image/png"
+	"io"
+	"os"
 	"strconv"
+	"strings"
 
 	"github.com/beevik/etree"
 )
@@ -23,7 +26,64 @@ type Image struct {
 // Raster knows how to create an Image.
 type Raster interface {
 	Raster() (image.Image, error)
+	// The following may be implemented to support textual serialization (pptadd)
+	Encode(w io.Writer) error
+	Magic() string
+	Decode(r LineReader) (Raster, error)
 }
+
+// LineReader can read line by line.
+type LineReader interface {
+	ReadLine() ([]byte, error)
+	Peek() ([]byte, error)
+	LineNumber() int
+}
+
+// PngFile is the file path of a raster image
+// It implements a serializable Raster.
+type PngFile struct {
+	Path string
+	im   image.Image
+}
+
+func (p PngFile) Raster() (m image.Image, e error) {
+	if p.im == nil {
+		p, e = p.load()
+	}
+	return p.im, e
+}
+func (p PngFile) Encode(w io.Writer) error { _, e := fmt.Fprintf(w, "File %s\n", p.Path); return e }
+func (p PngFile) Magic() string            { return "File" }
+func (p PngFile) Decode(r LineReader) (Raster, error) {
+	l, e := r.ReadLine()
+	if e != nil {
+		return nil, e
+	}
+	s := string(l)
+	if strings.HasPrefix(s, "File ") == false {
+		return nil, fmt.Errorf(`expected: File "path/to/file"`)
+	}
+	s = strings.TrimPrefix(s, "File ")
+	p.Path = s
+	return p.load()
+}
+func (p PngFile) load() (PngFile, error) {
+	if f, err := os.Open(p.Path); err != nil {
+		return p, err
+	} else {
+		defer f.Close()
+		p.im, err = png.Decode(f)
+		return p, err
+	}
+}
+
+// NoExchange can be embedded in a Raster that does not support serialization.
+type NoExchange struct{}
+
+func (n NoExchange) Encode(w io.Writer) error            { return n }
+func (n NoExchange) Magic() string                       { return n.Error() }
+func (n NoExchange) Decode(r LineReader) (Raster, error) { return nil, n }
+func (n NoExchange) Error() string                       { return "image is not serializable" }
 
 // addImageRef adds the image reference to the the slide's xml tree.
 // The image reference is appended to the slide at the path:
