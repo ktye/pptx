@@ -1,5 +1,5 @@
-package pptx // import "github.com/ktye/pptx"
----
+package pptx
+
 
 Package pptx creates and adds slides to powerpoint presentations.
 
@@ -23,6 +23,8 @@ Textboxes
     - Font, Fontsize
     - Multiline text
     - mark as title
+
+Item lists
 
 Images
 

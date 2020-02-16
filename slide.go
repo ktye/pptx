@@ -13,6 +13,7 @@ import (
 // It supports TextBoxes and Images.
 type Slide struct {
 	TextBoxes []TextBox       // TextBoxes.
+	ItemBoxes []ItemBox       // ItemBoxes.
 	Images    []Image         // Images will be encoded as png.
 	Master    int             // Slide layout master id. Default is 1
 	n         int             // Slide number
@@ -71,6 +72,11 @@ func (s *Slide) build(f *File) error {
 	s.xml = minimalSlide()
 	for i, tb := range s.TextBoxes {
 		if err := s.addTextBox(tb, i); err != nil {
+			return err
+		}
+	}
+	for i, ib := range s.ItemBoxes {
+		if err := s.addItemBox(ib, i); err != nil {
 			return err
 		}
 	}
@@ -337,40 +343,6 @@ func minimalSlide() *etree.Document {
 		</p:clrMapOvr>
 		</p:sld>
 	   	`)
-
-	// This is a bigger version // TODO: remove.
-	/*
-			err := d.ReadFromString(`
-		<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
-		<p:sld xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
-		  <p:cSld>
-		    <p:spTree>
-		      <p:nvGrpSpPr>
-		        <p:cNvPr id="1" name=""/>
-		        <p:cNvGrpSpPr/>
-		        <p:nvPr/>
-		      </p:nvGrpSpPr>
-		      <p:grpSpPr>
-		        <a:xfrm>
-		          <a:off x="0" y="0"/>
-		          <a:ext cx="0" cy="0"/>
-		          <a:chOff x="0" y="0"/>
-		          <a:chExt cx="0" cy="0"/>
-		        </a:xfrm>
-		      </p:grpSpPr>
-		    </p:spTree>
-		    <p:extLst>
-		      <p:ext uri="{BB962C8B-B14F-4D97-AF65-F5344CB8AC3E}">
-		        <p14:creationId xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" val="235730354"/>
-		      </p:ext>
-		    </p:extLst>
-		  </p:cSld>
-		  <p:clrMapOvr>
-		    <a:masterClrMapping/>
-		  </p:clrMapOvr>
-		</p:sld>
-		`)
-	*/
 	if err != nil {
 		panic(err) // This should parse without error.
 	}

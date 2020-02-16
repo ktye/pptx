@@ -2,6 +2,7 @@ package pptx
 
 import (
 	"fmt"
+	"image/color"
 	"strconv"
 	"strings"
 
@@ -11,16 +12,43 @@ import (
 // A TextBox can be added to a slide.
 type TextBox struct {
 	X, Y  Dimension // Position
-	Text  string    // Lines are split at "\n".
+	Lines []Line    // Lines of (colored) text.
 	Title bool      // Mark this textbox as slide title.
 	Font  Font      // Can be unspecified for defaults.
 	xml   *etree.Document
+}
+
+// A Line contains one or more elements (e.g. words) with individual colors.
+type Line []LineElement
+
+// A LineElement is a piece of text with a color.
+// If Color is nil, the color element is unset.
+type LineElement struct {
+	Text  string      // Text string
+	Color color.Color // Text color, alpha value is ignored.
 }
 
 // Font specifies the font used in the text box.
 type Font struct {
 	Name string  // E.g. "Courier New"
 	Size float64 // Font size.
+}
+
+// SimpleLines converts a string to Lines.
+// It splits at newline and does not set color.
+func SimpleLines(text string) []Line {
+	v := strings.Split(text, "\n")
+	lines := make([]Line, len(v))
+	for i, s := range v {
+		lines[i] = []LineElement{LineElement{Text: s}}
+	}
+	return lines
+}
+
+// color converts the color to "RRGGBB".
+func (l LineElement) color() string {
+	r, g, b, _ := l.Color.RGBA()
+	return fmt.Sprintf("%02X%02X%02X", r>>8, g>>8, b>>8)
 }
 
 // addTextBox adds a textbox the the slide's xml tree.
@@ -84,38 +112,48 @@ func (tb *TextBox) build(tbNum int) error {
 		ph := nvPr.CreateElement("p:ph")
 		ph.CreateAttr("type", "title")
 	}
-	lines := strings.Split(tb.Text, "\n")
-	for _, line := range lines {
+	for _, line := range tb.Lines {
 		txBody.Child = append(txBody.Child, tb.buildLine(line).Root())
 	}
 	return nil
 }
 
 // buildLine returns the xml tree for a text box line.
-func (tb TextBox) buildLine(line string) *etree.Document {
+func (tb TextBox) buildLine(line Line) *etree.Document {
 	doc := etree.NewDocument()
 	ap := doc.CreateElement("a:p")
-	ar := ap.CreateElement("a:r")
-	if tb.Font.Size > 0 || tb.Font.Name != "" {
-		arPr := ar.CreateElement("a:rPr")
-		if s := int(tb.Font.Size * 100); s > 0 {
-			arPr.Attr = []etree.Attr{
-				etree.Attr{Key: "sz", Value: strconv.Itoa(s)},
+	for _, word := range line {
+		ar := ap.CreateElement("a:r")
+		if tb.Font.Size > 0 || tb.Font.Name != "" {
+			arPr := ar.CreateElement("a:rPr")
+			if s := int(tb.Font.Size * 100); s > 0 {
+				arPr.Attr = []etree.Attr{
+					etree.Attr{Key: "sz", Value: strconv.Itoa(s)},
+				}
+			}
+
+			if word.Color != nil {
+				asolidFill := arPr.CreateElement("a:solidFill")
+				asrgbClr := asolidFill.CreateElement("a:srgbClr")
+				asrgbClr.Attr = []etree.Attr{
+					etree.Attr{Key: "val", Value: word.color()},
+				}
+			}
+
+			if tb.Font.Name != "" {
+				alatin := arPr.CreateElement("a:latin")
+				alatin.Attr = []etree.Attr{
+					etree.Attr{Key: "typeface", Value: tb.Font.Name},
+				}
+				acs := arPr.CreateElement("a:cs")
+				acs.Attr = []etree.Attr{
+					etree.Attr{Key: "typeface", Value: tb.Font.Name},
+				}
 			}
 		}
-		if tb.Font.Name != "" {
-			alatin := arPr.CreateElement("a:latin")
-			alatin.Attr = []etree.Attr{
-				etree.Attr{Key: "typeface", Value: tb.Font.Name},
-			}
-			acs := arPr.CreateElement("a:cs")
-			acs.Attr = []etree.Attr{
-				etree.Attr{Key: "typeface", Value: tb.Font.Name},
-			}
-		}
+		at := ar.CreateElement("a:t")
+		at.CreateCharData(word.Text)
 	}
-	at := ar.CreateElement("a:t")
-	at.CreateCharData(line)
 	return doc
 }
 

@@ -1,12 +1,55 @@
 package pptx
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"image/draw"
+	"io"
 	"os"
 	"testing"
+
+	"github.com/beevik/etree"
 )
+
+// printXml prints an xml file from the map or archive indented.
+func (f File) printXml(filePath string) error {
+	if err := f.readXml(filePath); err != nil {
+		return err
+	}
+	if xw, ok := f.m[filePath]; !ok {
+		return fmt.Errorf("%s: file has not been added to the map!", filePath)
+	} else {
+		x := xw.(*etree.Document)
+		x.Indent(2)
+		fmt.Printf("%s:\n", filePath)
+		x.WriteTo(os.Stdout)
+		fmt.Println()
+		return nil
+	}
+}
+
+// printPath prints a file in the archive with a given path.
+func (f File) printPath(filePath string) error {
+	fmt.Printf("print %s:\n", filePath)
+	for _, v := range f.r.File {
+		if v.Name == filePath {
+			if r, err := v.Open(); err != nil {
+				return err
+			} else {
+				if _, err := io.Copy(os.Stdout, r); err != nil {
+					return err
+				}
+				if err := r.Close(); err != nil {
+					return err
+				}
+				fmt.Println()
+				return nil
+			}
+		}
+	}
+	return fmt.Errorf("file %s does not exist", filePath)
+}
 
 func greyImage() image.Image {
 	w, h := 500, 300
@@ -15,90 +58,67 @@ func greyImage() image.Image {
 	return im
 }
 
-// TestNew creates a new file out.pptx with one slide.
-// In a second pass it opens the file again and adds 2 more slides.
-func TestNew(t *testing.T) {
-	var f File
-	var err error
-
-	// Create a new prentation using the template internal/data/minimal.pptx.
-	f, err = New("out.pptx")
-	if err != nil {
+func TestAppend(t *testing.T) {
+	if f, err := Open("minimal.pptx"); err != nil {
 		t.Fatal(err)
-	}
-
-	// Add a single slide.
-	s := Slide{
-		TextBoxes: []TextBox{
-			TextBox{
-				X:    20 * MilliMeter,
-				Y:    50 * MilliMeter,
-				Text: "This is a text box.",
-			},
-		},
-	}
-	if err := f.Add(s); err != nil {
-		t.Fatal(err)
-	}
-
-	// Close the file and open again.
-	if err := f.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	// Open a second time and add a new slide.
-	f, err = Open("out.pptx")
-	if err != nil {
-		t.Fatal("err")
-	}
-
-	// Add a slide with an image and 2 multiline textboxes
-	// with custom fonts.
-	s = Slide{
-		Images: []Image{
-			Image{
-				X:     20 * MilliMeter,
-				Y:     10 * MilliMeter,
-				Image: greyImage(),
-			},
-		},
-		TextBoxes: []TextBox{
-			TextBox{
-				X:    20 * MilliMeter,
-				Y:    100 * MilliMeter,
-				Text: "Normal textbox",
-			},
-			TextBox{
-				X:    20 * MilliMeter,
-				Y:    120 * MilliMeter,
-				Text: "This is a multiline\nTextbox with\nCourier New at size 22.",
-				Font: Font{
-					Name: "Courier New",
-					Size: 22,
+	} else {
+		s := Slide{
+			Images: []Image{
+				Image{
+					X:     60 * MilliMeter,
+					Y:     20 * MilliMeter,
+					Image: greyImage(),
 				},
 			},
-		},
-	}
-	err = f.Add(s)
-	if err != nil {
-		t.Fatal(err)
-	}
+			TextBoxes: []TextBox{
+				TextBox{
+					X:     30 * MilliMeter,
+					Y:     20 * MilliMeter,
+					Lines: SimpleLines("alpha beta gamma"),
+					Title: true,
+				},
+				TextBox{
+					X:     30 * MilliMeter,
+					Y:     60 * MilliMeter,
+					Lines: SimpleLines("Das ist TextBox 2 in 22 pt"),
+					Font:  Font{Size: 22},
+				},
+				TextBox{
+					X:     30 * MilliMeter,
+					Y:     90 * MilliMeter,
+					Lines: SimpleLines("Das ist TextBox 3 in 22 pt Courier New\nund noch eine Zeile."),
+					Font:  Font{Size: 22, Name: "Courier New"},
+				},
+			},
+		}
+		if err := f.Add(s); err != nil {
+			t.Fatal(err)
+		}
+		if err := f.Add(s); err != nil {
+			s.TextBoxes[0].Lines = SimpleLines("this is page 2")
+			t.Fatal(err)
+		}
 
-	// Add another slide to the open file.
-	s.TextBoxes[0].Text += " at 10 pt."
-	s.TextBoxes[0].Font.Size = 10
-	err = f.Add(s)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// Close the file.
-	if err := f.Close(); err != nil {
-		t.Fatal(err)
-	}
-
-	// Delete the file, uncomment to keep it.
-	if err := os.Remove("out.pptx"); err != nil {
-		t.Fatal(err)
+		// Add another slide.
+		s = Slide{
+			Images: []Image{
+				Image{
+					X:     60 * MilliMeter,
+					Y:     20 * MilliMeter,
+					Image: greyImage(),
+				},
+			},
+			TextBoxes: []TextBox{
+				TextBox{
+					X:     30 * MilliMeter,
+					Y:     90 * MilliMeter,
+					Lines: SimpleLines("another page has been added."),
+					Font:  Font{Size: 22, Name: "Courier New"},
+				},
+			},
+		}
+		if err := f.Add(s); err != nil {
+			t.Fatal(err)
+		}
 	}
 }

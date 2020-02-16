@@ -3,10 +3,8 @@ package pptx
 import (
 	"archive/zip"
 	"fmt"
-	"github.com/ktye/pptx/internal/bindata"
 	"io"
 	"os"
-
 	// "github.com/beevik/etree"
 )
 
@@ -14,8 +12,8 @@ import (
 type Dimension uint
 
 const MilliMeter Dimension = 36000
-
 const Inch Dimension = 914400
+const Dpi = 96 // Dpi is used to calculate the size of images.
 
 // File stores the zip reader for the original file and
 // a map of changed files.
@@ -33,32 +31,6 @@ type dummyReadCloser zip.ReadCloser
 
 func (z dummyReadCloser) Close() error {
 	return nil
-}
-
-// New creates and opens a new empty file.
-func New(filename string) (File, error) {
-	var f File
-	if b, err := bindata.Asset("minimal.pptx"); err != nil {
-		return f, fmt.Errorf("The minimal slide is not built-in: %s", err)
-	} else {
-		if minimal, err := os.Create(filename); err != nil {
-			return f, err
-		} else {
-			if n, err := minimal.Write(b); err != nil || n != len(b) {
-				if err != nil {
-					minimal.Close()
-					return f, fmt.Errorf("%s: not all bytes could be written", filename)
-				} else {
-					minimal.Close()
-					return f, fmt.Errorf("%s: %s\n", filename, err)
-				}
-			}
-			if err := minimal.Close(); err != nil {
-				return f, fmt.Errorf("%s: %s\n", filename, err)
-			}
-			return Open(filename)
-		}
-	}
 }
 
 // Open unzips a pptx file, and stores the content in file.

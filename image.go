@@ -58,8 +58,8 @@ func (s *Slide) addImageRef(im Image, imageNum int) error {
 
 // build create the xml tree of the image reference.
 func (im *Image) build(imNum int) (*etree.Document, error) {
-	cxDim := Dimension(im.Image.Bounds().Dx()) * Inch / 96 // We use 96 dpi to set the images extent.
-	cyDim := Dimension(im.Image.Bounds().Dy()) * Inch / 96
+	cxDim := Dimension(im.Image.Bounds().Dx()) * Inch / Dpi
+	cyDim := Dimension(im.Image.Bounds().Dy()) * Inch / Dpi
 	x := strconv.FormatUint(uint64(im.X), 10)
 	y := strconv.FormatUint(uint64(im.Y), 10)
 	cx := strconv.FormatUint(uint64(cxDim), 10)
