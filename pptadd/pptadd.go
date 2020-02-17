@@ -6,16 +6,15 @@ import (
 	"os"
 	"strings"
 
+	"github.com/ktye/plot"
 	"github.com/ktye/pptx"
 )
 
 func init() {
-	pptx.RegisterImageDecoder(pptx.PngFile{})
-	// todo ktye/plot
+	pptx.RegisterImageDecoder(plot.PptPlot{})
 }
 
 func main() {
-
 	var r io.Reader
 	args := os.Args[1:]
 	if n := len(args); n < 1 || n > 2 || strings.HasSuffix(args[0], ".pptx") == false {

@@ -51,48 +51,18 @@ func (f File) printPath(filePath string) error {
 	return fmt.Errorf("file %s does not exist", filePath)
 }
 
-type greyImage struct{ NoExchange }
-
-func (g greyImage) Raster() (image.Image, error) {
+func greyImage() image.Image {
 	w, h := 500, 300
 	im := image.NewGray(image.Rect(0, 0, w, h))
 	draw.Draw(im, im.Bounds(), &image.Uniform{color.Gray{128}}, image.ZP, draw.Src)
-	return im, nil
+	return im
 }
 
 func TestAppend(t *testing.T) {
 	if f, err := Open("minimal.pptx"); err != nil {
 		t.Fatal(err)
 	} else {
-		s := Slide{
-			Images: []Image{
-				Image{
-					X:     60 * MilliMeter,
-					Y:     20 * MilliMeter,
-					Image: greyImage{},
-				},
-			},
-			TextBoxes: []TextBox{
-				TextBox{
-					X:     30 * MilliMeter,
-					Y:     20 * MilliMeter,
-					Lines: SimpleLines("alpha beta gamma"),
-					Title: true,
-				},
-				TextBox{
-					X:     30 * MilliMeter,
-					Y:     60 * MilliMeter,
-					Lines: SimpleLines("Das ist TextBox 2 in 22 pt"),
-					Font:  Font{Size: 22},
-				},
-				TextBox{
-					X:     30 * MilliMeter,
-					Y:     90 * MilliMeter,
-					Lines: SimpleLines("Das ist TextBox 3 in 22 pt Courier New\nund noch eine Zeile."),
-					Font:  Font{Size: 22, Name: "Courier New"},
-				},
-			},
-		}
+		s := exampleSlide(1)
 		if err := f.Add(s); err != nil {
 			t.Fatal(err)
 		}
@@ -107,7 +77,7 @@ func TestAppend(t *testing.T) {
 				Image{
 					X:     60 * MilliMeter,
 					Y:     20 * MilliMeter,
-					Image: greyImage{},
+					Image: GoImage{greyImage()},
 				},
 			},
 			TextBoxes: []TextBox{
@@ -122,5 +92,37 @@ func TestAppend(t *testing.T) {
 		if err := f.Add(s); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func exampleSlide(n int) Slide {
+	return Slide{
+		Images: []Image{
+			Image{
+				X:     60 * MilliMeter,
+				Y:     20 * MilliMeter,
+				Image: GoImage{greyImage()},
+			},
+		},
+		TextBoxes: []TextBox{
+			TextBox{
+				X:     30 * MilliMeter,
+				Y:     20 * MilliMeter,
+				Lines: SimpleLines(fmt.Sprintf("Slide %d: alpha beta gamma", n)),
+				Title: true,
+			},
+			TextBox{
+				X:     30 * MilliMeter,
+				Y:     60 * MilliMeter,
+				Lines: SimpleLines("Das ist TextBox 2 in 22 pt"),
+				Font:  Font{Size: 22},
+			},
+			TextBox{
+				X:     30 * MilliMeter,
+				Y:     90 * MilliMeter,
+				Lines: SimpleLines("Das ist TextBox 3 in 22 pt Courier New\nund noch eine Zeile."),
+				Font:  Font{Size: 22, Name: "Courier New"},
+			},
+		},
 	}
 }

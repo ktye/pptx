@@ -8,6 +8,8 @@ import (
 	"io"
 	"io/ioutil"
 	"strings"
+
+	"github.com/ktye/pptx/pptxt"
 )
 
 // EncodeSlides encodes Slides to a text form.
@@ -29,7 +31,7 @@ func DecodeSlides(r io.Reader) ([]Slide, error) {
 	var slides []Slide
 	for {
 		s, e := decodeSlide(lr)
-		if e != nil {
+		if e == nil {
 			slides = append(slides, s)
 		} else if e == io.EOF {
 			return append(slides, s), nil
@@ -59,7 +61,7 @@ func encodeSlide(s Slide, w io.Writer, e error) error {
 	}
 	return e
 }
-func decodeSlide(r LineReader) (s Slide, e error) {
+func decodeSlide(r pptxt.LineReader) (s Slide, e error) {
 	e = expect(r, "Slide", e)
 	if e != nil {
 		return s, e
@@ -106,20 +108,24 @@ func (t TextBox) encode(w io.Writer, e error) error {
 	if e != nil {
 		return e
 	}
-	fmt.Println(w, " TextBox")
-	fmt.Fprintf(w, "  Position %d %d\n", t.X, t.Y)
+	fmt.Fprintln(w, " TextBox")
+	fmt.Fprintf(w, "  Position [%d, %d]\n", t.X, t.Y)
 	for _, l := range t.Lines {
 		fmt.Fprintf(w, "Line")
 		for _, le := range l {
-			r, g, b, _ := le.Color.RGBA()
+			r, g, b := uint32(0), uint32(0), uint32(0)
+			if le.Color != nil {
+				r, g, b, _ = le.Color.RGBA()
+			}
 			fmt.Fprintf(w, " %02x%02x%02x %q", r>>8, g>>8, b>>8, le.Text)
 		}
+		w.Write([]byte{'\n'})
 	}
 	e = js(w, "  Title", t.Title, e)
 	e = js(w, "  Font", t.Font, e)
 	return e
 }
-func decodeTextBox(r LineReader) (t TextBox, e error) {
+func decodeTextBox(r pptxt.LineReader) (t TextBox, e error) {
 	e = expect(r, "TextBox", e)
 	if e != nil {
 		return t, e
@@ -147,7 +153,7 @@ func decodeTextBox(r LineReader) (t TextBox, e error) {
 	e = sj(r, "Font", &t.Font, e)
 	return t, e
 }
-func decodeLine(r LineReader) (l Line, e error) {
+func decodeLine(r pptxt.LineReader) (l Line, e error) {
 	b, err := r.ReadLine()
 	if err != nil {
 		return l, err
@@ -179,7 +185,7 @@ func (b ItemBox) encode(w io.Writer, e error) error {
 	}
 	return e
 }
-func decodeItemBox(r LineReader) (t ItemBox, e error) {
+func decodeItemBox(r pptxt.LineReader) (t ItemBox, e error) {
 	e = expect(r, "ItemBox", e)
 	var xywh [4]Dimension
 	e = sj(r, "Position", &xywh, e)
@@ -220,9 +226,10 @@ func (b Image) encode(w io.Writer, e error) error {
 			return e
 		}
 	}
+	w.Write([]byte{'\n'})
 	return e
 }
-func decodeImage(r LineReader) (im Image, e error) {
+func decodeImage(r pptxt.LineReader) (im Image, e error) {
 	var xy [2]Dimension
 	e = expect(r, "Image", e)
 	e = sj(r, "Position", &xy, e)
@@ -238,8 +245,13 @@ func decodeImage(r LineReader) (im Image, e error) {
 	} else {
 		s := string(l)
 		for _, d := range imageDecoders {
-			if d.Magic() == s {
+			if mag := d.Magic(); len(mag) == 0 {
+				return im, fmt.Errorf("registered image decoder has no magic")
+			} else if strings.HasPrefix(s, mag) {
 				im.Image, e = d.Decode(r)
+				if e != nil {
+					return im, fmt.Errorf("line %d: %s", r.LineNumber(), e)
+				}
 				return im, e
 			}
 		}
@@ -258,7 +270,7 @@ func js(w io.Writer, name string, v interface{}, e error) error {
 	fmt.Fprintf(w, "%s %s\n", name, string(b))
 	return nil
 }
-func sj(r LineReader, name string, v interface{}, e error) error {
+func sj(r pptxt.LineReader, name string, v interface{}, e error) error {
 	if e != nil {
 		return e
 	}
@@ -277,7 +289,7 @@ func sj(r LineReader, name string, v interface{}, e error) error {
 	}
 	return nil
 }
-func expect(r LineReader, s string, e error) error {
+func expect(r pptxt.LineReader, s string, e error) error {
 	if e != nil {
 		return e
 	}
@@ -319,9 +331,13 @@ func (l *lineReader) LineNumber() int {
 	return l.lino
 }
 
-var imageDecoders []Raster
+var imageDecoders []pptxt.Raster
 
 // RegisterImageDecoder registers a custom Raster image serialization format.
-func RegisterImageDecoder(r Raster) {
+func RegisterImageDecoder(r pptxt.Raster) {
 	imageDecoders = append(imageDecoders, r)
+}
+func init() {
+	RegisterImageDecoder(GoImage{})
+	RegisterImageDecoder(PngFile{})
 }

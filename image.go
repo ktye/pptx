@@ -2,6 +2,7 @@ package pptx
 
 import (
 	"bytes"
+	"encoding/base64"
 	"fmt"
 	"image"
 	"image/png"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/beevik/etree"
+	"github.com/ktye/pptx/pptxt"
 )
 
 // What should be the image's dimensions?
@@ -20,23 +22,7 @@ import (
 // An Image can be added to a Slide.
 type Image struct {
 	X, Y  Dimension
-	Image Raster
-}
-
-// Raster knows how to create an Image.
-type Raster interface {
-	Raster() (image.Image, error)
-	// The following may be implemented to support textual serialization (pptadd)
-	Encode(w io.Writer) error
-	Magic() string
-	Decode(r LineReader) (Raster, error)
-}
-
-// LineReader can read line by line.
-type LineReader interface {
-	ReadLine() ([]byte, error)
-	Peek() ([]byte, error)
-	LineNumber() int
+	Image pptxt.Raster
 }
 
 // PngFile is the file path of a raster image
@@ -54,7 +40,7 @@ func (p PngFile) Raster() (m image.Image, e error) {
 }
 func (p PngFile) Encode(w io.Writer) error { _, e := fmt.Fprintf(w, "File %s\n", p.Path); return e }
 func (p PngFile) Magic() string            { return "File" }
-func (p PngFile) Decode(r LineReader) (Raster, error) {
+func (p PngFile) Decode(r pptxt.LineReader) (pptxt.Raster, error) {
 	l, e := r.ReadLine()
 	if e != nil {
 		return nil, e
@@ -77,13 +63,39 @@ func (p PngFile) load() (PngFile, error) {
 	}
 }
 
+// GoImage is a serializable Raster image that can be any image.Image.
+type GoImage struct {
+	image.Image
+}
+
+func (g GoImage) Raster() (image.Image, error) { return g.Image, nil }
+func (g GoImage) Encode(w io.Writer) error {
+	w.Write([]byte("GoImage "))
+	enc := base64.NewEncoder(base64.StdEncoding, w)
+	if e := png.Encode(enc, g.Image); e != nil {
+		return e
+	}
+	enc.Close()
+	return nil
+}
+func (g GoImage) Magic() string { return "GoImage" }
+func (g GoImage) Decode(r pptxt.LineReader) (pptxt.Raster, error) {
+	l, e := r.ReadLine()
+	if e != nil {
+		return nil, e
+	}
+	var m image.Image
+	m, e = png.Decode(base64.NewDecoder(base64.StdEncoding, bytes.NewReader(bytes.TrimPrefix(l, []byte("GoImage ")))))
+	return GoImage{m}, e
+}
+
 // NoExchange can be embedded in a Raster that does not support serialization.
 type NoExchange struct{}
 
-func (n NoExchange) Encode(w io.Writer) error            { return n }
-func (n NoExchange) Magic() string                       { return n.Error() }
-func (n NoExchange) Decode(r LineReader) (Raster, error) { return nil, n }
-func (n NoExchange) Error() string                       { return "image is not serializable" }
+func (n NoExchange) Encode(w io.Writer) error                        { return n }
+func (n NoExchange) Magic() string                                   { return n.Error() }
+func (n NoExchange) Decode(r pptxt.LineReader) (pptxt.Raster, error) { return nil, n }
+func (n NoExchange) Error() string                                   { return "this image type is not serializable" }
 
 // addImageRef adds the image reference to the the slide's xml tree.
 // The image reference is appended to the slide at the path:
