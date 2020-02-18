@@ -2,6 +2,7 @@ package pptx
 
 import (
 	"bytes"
+	"fmt"
 	"testing"
 )
 
@@ -9,6 +10,8 @@ func TestEncDec(t *testing.T) {
 	slds := []Slide{exampleSlide(1), exampleSlide(2)}
 	b1 := testEncode(t, slds)
 	if string(b1) != twoSlides {
+		fmt.Println(string(b1))
+		fmt.Println(twoSlides)
 		t.Fatalf("text encoding mismatches")
 	}
 	// os.Stdout.Write(b1)
@@ -36,18 +39,18 @@ const twoSlides = `Slide
  Master 0
  TextBox
   Position [1080000, 720000]
-Line 000000 "Slide 1: alpha beta gamma"
+   Line 000000 "Slide 1: alpha beta gamma"
   Title true
   Font {"Name":"","Size":0}
  TextBox
   Position [1080000, 2160000]
-Line 000000 "Das ist TextBox 2 in 22 pt"
+   Line 000000 "Das ist TextBox 2 in 22 pt"
   Title false
   Font {"Name":"","Size":22}
  TextBox
   Position [1080000, 3240000]
-Line 000000 "Das ist TextBox 3 in 22 pt Courier New"
-Line 000000 "und noch eine Zeile."
+   Line 000000 "Das ist TextBox 3 in 22 pt Courier New"
+   Line 000000 "und noch eine Zeile."
   Title false
   Font {"Name":"Courier New","Size":22}
  Image
@@ -57,18 +60,18 @@ Slide
  Master 0
  TextBox
   Position [1080000, 720000]
-Line 000000 "Slide 2: alpha beta gamma"
+   Line 000000 "Slide 2: alpha beta gamma"
   Title true
   Font {"Name":"","Size":0}
  TextBox
   Position [1080000, 2160000]
-Line 000000 "Das ist TextBox 2 in 22 pt"
+   Line 000000 "Das ist TextBox 2 in 22 pt"
   Title false
   Font {"Name":"","Size":22}
  TextBox
   Position [1080000, 3240000]
-Line 000000 "Das ist TextBox 3 in 22 pt Courier New"
-Line 000000 "und noch eine Zeile."
+   Line 000000 "Das ist TextBox 3 in 22 pt Courier New"
+   Line 000000 "und noch eine Zeile."
   Title false
   Font {"Name":"Courier New","Size":22}
  Image

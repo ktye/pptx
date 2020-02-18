@@ -111,7 +111,7 @@ func (t TextBox) encode(w io.Writer, e error) error {
 	fmt.Fprintln(w, " TextBox")
 	fmt.Fprintf(w, "  Position [%d, %d]\n", t.X, t.Y)
 	for _, l := range t.Lines {
-		fmt.Fprintf(w, "Line")
+		fmt.Fprintf(w, "   Line")
 		for _, le := range l {
 			r, g, b := uint32(0), uint32(0), uint32(0)
 			if le.Color != nil {
@@ -220,13 +220,13 @@ func (b Image) encode(w io.Writer, e error) error {
 	if e != nil {
 		return e
 	}
-	lines := bytes.Split(buf.Bytes(), []byte{'\n'}) // Indent
+	lines := bytes.Split(bytes.Trim(buf.Bytes(), "\n\r\t "), []byte{'\n'}) // Indent
 	for i := range lines {
+		lines[i] = append(lines[i], '\n')
 		if _, e = w.Write(append([]byte{' ', ' '}, lines[i]...)); e != nil {
 			return e
 		}
 	}
-	w.Write([]byte{'\n'})
 	return e
 }
 func decodeImage(r pptxt.LineReader) (im Image, e error) {

@@ -38,7 +38,7 @@ func (p PngFile) Raster() (m image.Image, e error) {
 	}
 	return p.im, e
 }
-func (p PngFile) Encode(w io.Writer) error { _, e := fmt.Fprintf(w, "File %s\n", p.Path); return e }
+func (p PngFile) Encode(w io.Writer) error { _, e := fmt.Fprintf(w, "File %s", p.Path); return e }
 func (p PngFile) Magic() string            { return "File" }
 func (p PngFile) Decode(r pptxt.LineReader) (pptxt.Raster, error) {
 	l, e := r.ReadLine()
