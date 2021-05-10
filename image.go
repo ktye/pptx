@@ -12,7 +12,6 @@ import (
 	"strings"
 
 	"github.com/beevik/etree"
-	"github.com/ktye/pptx/pptxt"
 )
 
 // What should be the image's dimensions?
@@ -22,7 +21,7 @@ import (
 // An Image can be added to a Slide.
 type Image struct {
 	X, Y  Dimension
-	Image pptxt.Raster
+	Image Raster
 }
 
 // PngFile is the file path of a raster image
@@ -40,7 +39,11 @@ func (p PngFile) Raster() (m image.Image, e error) {
 }
 func (p PngFile) Encode(w io.Writer) error { _, e := fmt.Fprintf(w, "File %s", p.Path); return e }
 func (p PngFile) Magic() string            { return "File" }
-func (p PngFile) Decode(r pptxt.LineReader) (pptxt.Raster, error) {
+func (p PngFile) Decode(ri interface{}) (interface{}, error) {
+	r, o := ri.(LineReader)
+	if o == false {
+		return nil, fmt.Errorf("decode png: expect LineReader")
+	}
 	l, e := r.ReadLine()
 	if e != nil {
 		return nil, e
@@ -79,7 +82,11 @@ func (g GoImage) Encode(w io.Writer) error {
 	return nil
 }
 func (g GoImage) Magic() string { return "GoImage" }
-func (g GoImage) Decode(r pptxt.LineReader) (pptxt.Raster, error) {
+func (g GoImage) Decode(ri interface{}) (interface{}, error) {
+	r, o := ri.(LineReader)
+	if o == false {
+		return nil, fmt.Errorf("decode goimage: expecte LineReader")
+	}
 	l, e := r.ReadLine()
 	if e != nil {
 		return nil, e
@@ -92,10 +99,10 @@ func (g GoImage) Decode(r pptxt.LineReader) (pptxt.Raster, error) {
 // NoExchange can be embedded in a Raster that does not support serialization.
 type NoExchange struct{}
 
-func (n NoExchange) Encode(w io.Writer) error                        { return n }
-func (n NoExchange) Magic() string                                   { return n.Error() }
-func (n NoExchange) Decode(r pptxt.LineReader) (pptxt.Raster, error) { return nil, n }
-func (n NoExchange) Error() string                                   { return "this image type is not serializable" }
+func (n NoExchange) Encode(w io.Writer) error                 { return n }
+func (n NoExchange) Magic() string                            { return n.Error() }
+func (n NoExchange) Decode(r LineReader) (interface{}, error) { return nil, n }
+func (n NoExchange) Error() string                            { return "this image type is not serializable" }
 
 // addImageRef adds the image reference to the the slide's xml tree.
 // The image reference is appended to the slide at the path:

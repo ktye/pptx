@@ -4,13 +4,29 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"image"
 	"image/color"
 	"io"
 	"io/ioutil"
 	"strings"
-
-	"github.com/ktye/pptx/pptxt"
 )
+
+// Raster defines methods for a raster image that is able to encode/decode itself from text form.
+type Raster interface {
+	Raster() (image.Image, error)
+	// The following may be implemented to support textual serialization (pptadd)
+	Encode(w io.Writer) error
+	Magic() string
+	Decode(interface{}) (interface{}, error)
+}
+
+// LineReader can read line by line.
+// Lines are trimmed of whitespace: "\r\n\t "
+type LineReader interface {
+	ReadLine() ([]byte, error)
+	Peek() ([]byte, error)
+	LineNumber() int
+}
 
 // EncodeSlides encodes Slides to a text form.
 func EncodeSlides(slides []Slide, w io.Writer) (e error) {
@@ -61,7 +77,7 @@ func encodeSlide(s Slide, w io.Writer, e error) error {
 	}
 	return e
 }
-func decodeSlide(r pptxt.LineReader) (s Slide, e error) {
+func decodeSlide(r LineReader) (s Slide, e error) {
 	e = expect(r, "Slide", e)
 	if e != nil {
 		return s, e
@@ -125,7 +141,7 @@ func (t TextBox) encode(w io.Writer, e error) error {
 	e = js(w, "  Font", t.Font, e)
 	return e
 }
-func decodeTextBox(r pptxt.LineReader) (t TextBox, e error) {
+func decodeTextBox(r LineReader) (t TextBox, e error) {
 	e = expect(r, "TextBox", e)
 	if e != nil {
 		return t, e
@@ -153,7 +169,7 @@ func decodeTextBox(r pptxt.LineReader) (t TextBox, e error) {
 	e = sj(r, "Font", &t.Font, e)
 	return t, e
 }
-func decodeLine(r pptxt.LineReader) (l Line, e error) {
+func decodeLine(r LineReader) (l Line, e error) {
 	b, err := r.ReadLine()
 	if err != nil {
 		return l, err
@@ -185,7 +201,7 @@ func (b ItemBox) encode(w io.Writer, e error) error {
 	}
 	return e
 }
-func decodeItemBox(r pptxt.LineReader) (t ItemBox, e error) {
+func decodeItemBox(r LineReader) (t ItemBox, e error) {
 	e = expect(r, "ItemBox", e)
 	var xywh [4]Dimension
 	e = sj(r, "Position", &xywh, e)
@@ -229,7 +245,7 @@ func (b Image) encode(w io.Writer, e error) error {
 	}
 	return e
 }
-func decodeImage(r pptxt.LineReader) (im Image, e error) {
+func decodeImage(r LineReader) (im Image, e error) {
 	var xy [2]Dimension
 	e = expect(r, "Image", e)
 	e = sj(r, "Position", &xy, e)
@@ -248,9 +264,14 @@ func decodeImage(r pptxt.LineReader) (im Image, e error) {
 			if mag := d.Magic(); len(mag) == 0 {
 				return im, fmt.Errorf("registered image decoder has no magic")
 			} else if strings.HasPrefix(s, mag) {
-				im.Image, e = d.Decode(r)
+				rim, e := d.Decode(r)
 				if e != nil {
 					return im, fmt.Errorf("line %d: %s", r.LineNumber(), e)
+				}
+				var ok bool
+				im.Image, ok = rim.(Raster)
+				if !ok {
+					return im, fmt.Errorf("line %d: cannot decode image", r.LineNumber())
 				}
 				return im, e
 			}
@@ -270,7 +291,7 @@ func js(w io.Writer, name string, v interface{}, e error) error {
 	fmt.Fprintf(w, "%s %s\n", name, string(b))
 	return nil
 }
-func sj(r pptxt.LineReader, name string, v interface{}, e error) error {
+func sj(r LineReader, name string, v interface{}, e error) error {
 	if e != nil {
 		return e
 	}
@@ -289,7 +310,7 @@ func sj(r pptxt.LineReader, name string, v interface{}, e error) error {
 	}
 	return nil
 }
-func expect(r pptxt.LineReader, s string, e error) error {
+func expect(r LineReader, s string, e error) error {
 	if e != nil {
 		return e
 	}
@@ -331,10 +352,10 @@ func (l *lineReader) LineNumber() int {
 	return l.lino
 }
 
-var imageDecoders []pptxt.Raster
+var imageDecoders []Raster
 
 // RegisterImageDecoder registers a custom Raster image serialization format.
-func RegisterImageDecoder(r pptxt.Raster) {
+func RegisterImageDecoder(r Raster) {
 	imageDecoders = append(imageDecoders, r)
 }
 func init() {
