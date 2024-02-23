@@ -104,6 +104,12 @@ func (f *File) addToContentTypes(slide Slide) error {
 		return fmt.Errorf("cannot find: %s", contentTypes)
 	} else {
 		x := xw.(*etree.Document)
+		if hasPngType(x) == false {
+			e := addPngType(x)
+			if e != nil {
+				return e
+			}
+		}
 		partName := "/ppt/slides/" + slide.name
 		typesElement := x.SelectElement("Types")
 		if typesElement == nil {
@@ -117,14 +123,38 @@ func (f *File) addToContentTypes(slide Slide) error {
 	}
 	return nil
 }
+func hasPngType(d *etree.Document) bool {
+	defs := d.FindElements("/Types/Default")
+	for _, x := range defs {
+		for _, a := range x.Attr {
+			if a.Key == "Extension" && a.Value == "png" {
+				return true
+			}
+		}
+	}
+	return false
+}
+func addPngType(d *etree.Document) error {
+	t := d.SelectElement("Types")
+	if t == nil {
+		return fmt.Errorf("cannot find Types element")
+	}
+	e := t.CreateElement("Default")
+	e.CreateAttr("Extension", "png")
+	e.CreateAttr("ContentType", "image/png")
+	return nil
+}
 
 // addToRelationships adds the new slide entry to ppt/_rels/presentation.xml.rels.
 // The file has the form:
-// 	<Relationships ...
+//
+//	<Relationships ...
 //		<Relationship Id=rId3 Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps" ...
 //		<Relationship Id=rId7 Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps" ...
+//
 // Create a new ID and add a relationship for the slide:
-//		<Relationship Id=rId? Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps" Target="slides/slide3.xml"/>
+//
+//	<Relationship Id=rId? Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/presProps" Target="slides/slide3.xml"/>
 func (f *File) addToRelationships(slide *Slide) error {
 	relFile := "ppt/_rels/presentation.xml.rels"
 	if err := f.readXml(relFile); err != nil {
@@ -220,6 +250,7 @@ func (f *File) addSlideRels(slide Slide) error {
 
 // addToPresentation adds the slide reference to ppt/presentation.xml.
 // <p:presentation xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/ma
+//
 //	<p:sldIdLst>
 //		<p:sldId id="256" r:id="rId7"/> // firt slide starts at id=256
 //		<p:sldId id="257" r:id="rId8"/>
