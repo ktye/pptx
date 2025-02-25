@@ -74,11 +74,7 @@ func TestAppend(t *testing.T) {
 		// Add another slide.
 		s = Slide{
 			Images: []Image{
-				Image{
-					X:     60 * MilliMeter,
-					Y:     20 * MilliMeter,
-					Image: GoImage{greyImage()},
-				},
+				NewImage(greyImage(), 60*MilliMeter, 20*MilliMeter, 130*MilliMeter, 80*MilliMeter),
 			},
 			TextBoxes: []TextBox{
 				TextBox{
@@ -98,11 +94,7 @@ func TestAppend(t *testing.T) {
 func exampleSlide(n int) Slide {
 	return Slide{
 		Images: []Image{
-			Image{
-				X:     60 * MilliMeter,
-				Y:     20 * MilliMeter,
-				Image: GoImage{greyImage()},
-			},
+			NewImage(greyImage(), 60*MilliMeter, 20*MilliMeter, 130*MilliMeter, 80*MilliMeter),
 		},
 		TextBoxes: []TextBox{
 			TextBox{
