@@ -104,12 +104,20 @@ func (f *File) addToContentTypes(slide Slide) error {
 		return fmt.Errorf("cannot find: %s", contentTypes)
 	} else {
 		x := xw.(*etree.Document)
-		if hasPngType(x) == false {
-			e := addPngType(x)
-			if e != nil {
-				return e
-			}
+		if e := needsType(x, "png"); e != nil {
+			return e
 		}
+		if e := needsType(x, "wmf"); e != nil {
+			return e
+		}
+		/*
+			if hasType(x) == false {
+				e := addPngType(x)
+				if e != nil {
+					return e
+				}
+			}
+		*/
 		partName := "/ppt/slides/" + slide.name
 		typesElement := x.SelectElement("Types")
 		if typesElement == nil {
@@ -123,6 +131,34 @@ func (f *File) addToContentTypes(slide Slide) error {
 	}
 	return nil
 }
+func needsType(d *etree.Document, ext string) error {
+	defs := d.FindElements("/Types/Default")
+	for _, x := range defs {
+		for _, a := range x.Attr {
+			if a.Key == "Extension" && a.Value == ext {
+				return nil
+			}
+		}
+	}
+	types := map[string]string{
+		"png": "image/png",
+		"wmf": "image/x-wmf",
+	}
+	mim, o := types[ext]
+	if !o {
+		return fmt.Errorf("mime type unknown for: %s", ext)
+	}
+	t := d.SelectElement("Types")
+	if t == nil {
+		return fmt.Errorf("cannot find Types element")
+	}
+	e := t.CreateElement("Default")
+	e.CreateAttr("Extension", ext)
+	e.CreateAttr("ContentType", mim)
+	return nil
+}
+
+/*
 func hasPngType(d *etree.Document) bool {
 	defs := d.FindElements("/Types/Default")
 	for _, x := range defs {
@@ -144,6 +180,7 @@ func addPngType(d *etree.Document) error {
 	e.CreateAttr("ContentType", "image/png")
 	return nil
 }
+*/
 
 // addToRelationships adds the new slide entry to ppt/_rels/presentation.xml.rels.
 // The file has the form:
@@ -237,11 +274,11 @@ func (f *File) addSlideRels(slide Slide) error {
 	e.CreateAttr("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/slideLayout")
 	e.CreateAttr("Target", fmt.Sprintf("../slideLayouts/slideLayout%d.xml", slide.Master))
 	// Add relations for each image in the slide.
-	for i := range slide.Images {
+	for i, m := range slide.Images {
 		e := rootElement.CreateElement("Relationship")
 		e.CreateAttr("Id", fmt.Sprintf("rId%d", i+2)) // rId2...
 		e.CreateAttr("Type", "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image")
-		e.CreateAttr("Target", fmt.Sprintf("../media/slide%dimage%d.png", slide.n, i))
+		e.CreateAttr("Target", fmt.Sprintf("../media/slide%dimage%d.%s", slide.n, i, m.Extension))
 	}
 	// Add the file to the map.
 	f.m[relFile] = &d

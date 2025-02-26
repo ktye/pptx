@@ -30,6 +30,7 @@ func NewImage(m image.Image, x, y, w, h Dimension) Image {
 	png.Encode(&b, m)
 	return Image{x, y, w, h, "png", b.Bytes()}
 }
+func NewWmf(wmf []byte, x, y, w, h Dimension) Image { return Image{x, y, w, h, "wmf", wmf} }
 
 // addImageRef adds the image reference to the the slide's xml tree.
 // The image reference is appended to the slide at the path:
