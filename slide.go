@@ -107,7 +107,7 @@ func (f *File) addToContentTypes(slide Slide) error {
 		if e := needsType(x, "png"); e != nil {
 			return e
 		}
-		if e := needsType(x, "wmf"); e != nil {
+		if e := needsType(x, "emf"); e != nil {
 			return e
 		}
 		/*
@@ -142,7 +142,8 @@ func needsType(d *etree.Document, ext string) error {
 	}
 	types := map[string]string{
 		"png": "image/png",
-		"wmf": "image/x-wmf",
+		"emf": "image/x-emf",
+		//"wmf": "image/x-wmf",
 	}
 	mim, o := types[ext]
 	if !o {
